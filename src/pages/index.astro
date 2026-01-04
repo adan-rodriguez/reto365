@@ -1,11 +1,131 @@
 ---
-import Welcome from '../components/Welcome.astro';
-import Layout from '../layouts/Layout.astro';
+import VideoCard from "../components/VideoCard.astro";
+import { videos } from "../data/videos.js";
 
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
+// Ordenamos para ver el último día primero
+const sortedVideos = [...videos].sort((a, b) => b.day - a.day);
+
+// Calculamos el total acumulado (opcional, solo por diversión estadística)
+const totalPushups = videos.reduce((acc, curr) => acc + curr.count, 0);
 ---
 
-<Layout>
-	<Welcome />
-</Layout>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Reto Flexiones 2026</title>
+  </head>
+  <body>
+    <main>
+      <header class="hero">
+        <h1>Reto de Flexiones <span class="year">2026</span></h1>
+        <p class="subtitle">Una flexión más cada día hasta fin de año.</p>
+
+        <div class="stats">
+          <div class="stat-box">
+            <span class="label">Día Actual</span>
+            <span class="value">{videos.length}</span>
+          </div>
+          <div class="stat-box">
+            <span class="label">Flexiones Hoy</span>
+            <span class="value">{videos[videos.length - 1]?.count || 0}</span>
+          </div>
+          <div class="stat-box">
+            <span class="label">Total Acumulado</span>
+            <span class="value">{totalPushups}</span>
+          </div>
+        </div>
+      </header>
+
+      <section class="grid">
+        {
+          sortedVideos.map((video) => (
+            <VideoCard
+              day={video.day}
+              count={video.count}
+              date={video.date}
+              videoId={video.videoId}
+              description={video.description}
+            />
+          ))
+        }
+      </section>
+    </main>
+  </body>
+</html>
+
+<style>
+  /* Estilos Globales Simples */
+  body {
+    font-family: system-ui, sans-serif;
+    background-color: #121212;
+    color: white;
+    margin: 0;
+    padding: 0;
+  }
+
+  main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  /* Hero Section */
+  .hero {
+    text-align: center;
+    margin-bottom: 3rem;
+    padding: 2rem 0;
+  }
+
+  h1 {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .year {
+    color: #646cff;
+  }
+
+  .subtitle {
+    font-size: 1.2rem;
+    color: #ccc;
+    margin-bottom: 2rem;
+  }
+
+  /* Estadísticas */
+  .stats {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .stat-box {
+    background: #2a2a2a;
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  .stat-box .label {
+    display: block;
+    font-size: 0.8rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .stat-box .value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #fff;
+  }
+
+  /* Grid de Videos */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 2rem;
+  }
+</style>
