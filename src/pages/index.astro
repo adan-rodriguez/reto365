@@ -1,129 +1,187 @@
----
-import VideoCard from "../components/VideoCard.astro";
-import { videos } from "../data/videos.js";
-
-// 1. Lógica de ordenamiento y estadísticas
-const sortedVideos = [...videos].sort((a, b) => b.day - a.day);
-const currentDay = videos.length;
-const lastVideo = videos[videos.length - 1];
-const totalPushups = videos.reduce((acc, curr) => acc + curr.count, 0);
-
-// 2. Lógica de la Barra de Progreso
-const GOAL_DAYS = 365;
-// Calculamos el porcentaje (con un decimal para ver pequeños avances)
-const progressPercent = Math.min((currentDay / GOAL_DAYS) * 100, 100).toFixed(
-  1
-);
----
-
 <html lang="es">
   <head>
     <meta charset="utf-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width" />
     <title>Reto Flexiones 2026</title>
+    <script
+      is:inline
+      src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"
+    ></script>
   </head>
   <body>
     <main>
       <header class="hero">
         <h1>Reto de Flexiones <span class="accent">2026</span></h1>
         <p class="subtitle">
-          La disciplina es hacer lo que tienes que hacer, incluso cuando no
-          quieres.
+          Una flexión de brazo más por día hasta que termine el año.
         </p>
 
-        <div class="progress-section">
+        <div
+          class="progress-section"
+          id="progress-container"
+          style="display: none;"
+        >
           <div class="progress-labels">
-            <span>Progreso del Reto</span>
-            <span class="progress-text"
-              >{progressPercent}% ({currentDay}/{GOAL_DAYS} días)</span
-            >
+            <span>Progreso</span>
+            <span class="progress-text" id="progress-text">0%</span>
           </div>
-
           <div class="progress-track">
-            <div class="progress-fill" style={`width: ${progressPercent}%;`}>
+            <div class="progress-fill" id="progress-fill" style="width: 0%;">
             </div>
           </div>
         </div>
-        <div class="stats">
+
+        <div
+          class="stats"
+          id="stats-container"
+          style="opacity: 0; transition: opacity 0.5s;"
+        >
           <div class="stat-box">
             <span class="label">Día Actual</span>
-            <span class="value">{currentDay}</span>
+            <span class="value" id="stat-day">-</span>
           </div>
           <div class="stat-box">
             <span class="label">Flexiones Hoy</span>
-            <span class="value">{lastVideo?.count || 0}</span>
+            <span class="value" id="stat-today">-</span>
           </div>
           <div class="stat-box">
             <span class="label">Total Acumulado</span>
-            <span class="value">{totalPushups}</span>
+            <span class="value" id="stat-total">-</span>
           </div>
         </div>
       </header>
 
-      <section class="grid">
-        {
-          sortedVideos.map((video) => (
-            <VideoCard
-              day={video.day}
-              count={video.count}
-              date={video.date}
-              videoId={video.videoId}
-              description={video.description}
-            />
-          ))
-        }
+      <section class="grid" id="video-grid">
+        <p style="text-align: center; color: #666;">Cargando videos...</p>
       </section>
     </main>
+
+    <script is:inline>
+      const SHEET_URL =
+        "https://docs.google.com/spreadsheets/d/e/2PACX-1vSi5taqFE6-_lgB2ds-962Dga1nvfQcez6XjQzK-tfA1M0yWDfz9Pe9e0Q4sBiNlO3EZVWz33tevfoq/pub?gid=0&single=true&output=csv";
+
+      const GOAL_DAYS = 365;
+
+      // Función para crear la tarjeta HTML
+      function createCard(video) {
+        return `
+          <article class="card fade-in">
+            <div class="video-container">
+              <iframe
+                src="https://www.youtube.com/embed/${video.videoId}"
+                title="Día ${video.day}"
+                frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen
+                loading="lazy" 
+              ></iframe>
+            </div>
+            <div class="info">
+              <header class="card-header">
+                <span class="badge">Día ${video.day}</span>
+                <span class="date">${video.date}</span>
+              </header>
+              <h2>${video.count} Flexiones</h2>
+              ${video.description ? `<p>${video.description}</p>` : ""}
+            </div>
+          </article>
+        `;
+      }
+
+      // Descargamos y procesamos los datos
+      Papa.parse(SHEET_URL, {
+        download: true,
+        header: true,
+        complete: function (results) {
+          const rawData = results.data;
+
+          // Filtramos filas vacías y limpiamos datos
+          const videos = rawData
+            .filter((row) => row.day && row.videoId) // Solo filas con datos
+            .map((row) => ({
+              day: parseInt(row.day),
+              count: parseInt(row.count),
+              date: row.date,
+              videoId: row.videoId.trim(),
+              description: row.description,
+            }))
+            .sort((a, b) => b.day - a.day); // Ordenar: más reciente primero
+
+          if (videos.length === 0) return;
+
+          // 1. Actualizar Estadísticas
+          const currentDay = videos.length;
+          const totalPushups = videos.reduce(
+            (acc, curr) => acc + curr.count,
+            0
+          );
+          const percent = Math.min((currentDay / GOAL_DAYS) * 100, 100).toFixed(
+            1
+          );
+
+          document.getElementById("stat-day").innerText = currentDay;
+          document.getElementById("stat-today").innerText = videos[0].count; // El primero es el más reciente
+          document.getElementById("stat-total").innerText = totalPushups;
+          document.getElementById("stats-container").style.opacity = 1;
+
+          // 2. Actualizar Barra
+          document.getElementById("progress-text").innerText =
+            `${percent}% (${currentDay}/${GOAL_DAYS})`;
+          document.getElementById("progress-fill").style.width = `${percent}%`;
+          document.getElementById("progress-container").style.display = "block";
+
+          // 3. Renderizar Videos
+          const grid = document.getElementById("video-grid");
+          grid.innerHTML = videos.map(createCard).join("");
+        },
+        error: function (err) {
+          console.error("Error cargando Sheet:", err);
+          document.getElementById("video-grid").innerHTML =
+            '<p style="color:red">Error cargando los datos.</p>';
+        },
+      });
+    </script>
   </body>
 </html>
 
-<style>
-  /* --- Estilos Globales --- */
+<style is:global>
   body {
-    font-family: "Segoe UI", system-ui, sans-serif; /* Fuente más moderna */
+    font-family: "Segoe UI", system-ui, sans-serif;
     background-color: #121212;
     color: white;
     margin: 0;
     padding: 0;
   }
-
   main {
     max-width: 1000px;
     margin: 0 auto;
     padding: 2rem;
   }
 
-  /* --- Hero Section --- */
   .hero {
     text-align: center;
     margin-bottom: 4rem;
     padding-top: 2rem;
   }
-
   h1 {
     font-size: 3.5rem;
     margin-bottom: 0.5rem;
     font-weight: 800;
     letter-spacing: -1px;
   }
-
   .accent {
     background: linear-gradient(45deg, #646cff, #a855f7);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
   }
-
   .subtitle {
     font-size: 1.1rem;
     color: #a1a1aa;
     margin-bottom: 3rem;
-    max-width: 600px;
-    margin-left: auto;
-    margin-right: auto;
   }
 
-  /* --- Barra de Progreso (NUEVOS ESTILOS) --- */
+  /* Barra de Progreso */
   .progress-section {
     max-width: 600px;
     margin: 0 auto 3rem auto;
@@ -131,46 +189,38 @@ const progressPercent = Math.min((currentDay / GOAL_DAYS) * 100, 100).toFixed(
     padding: 1.5rem;
     border-radius: 16px;
     border: 1px solid #333;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
   }
-
   .progress-labels {
     display: flex;
     justify-content: space-between;
     margin-bottom: 0.8rem;
-    font-size: 0.9rem;
-    font-weight: 600;
     color: #e4e4e7;
+    font-weight: 600;
   }
-
   .progress-text {
-    color: #a855f7; /* Color violeta claro */
+    color: #a855f7;
   }
-
   .progress-track {
     width: 100%;
     height: 12px;
     background-color: #333;
     border-radius: 999px;
-    overflow: hidden; /* Para que la barra interna no se salga de los bordes redondeados */
+    overflow: hidden;
   }
-
   .progress-fill {
     height: 100%;
     background: linear-gradient(90deg, #646cff, #a855f7);
     border-radius: 999px;
-    transition: width 1s ease-out; /* Animación suave al cargar */
-    box-shadow: 0 0 10px rgba(168, 85, 247, 0.5); /* Resplandor sutil */
+    transition: width 1s ease-out;
   }
 
-  /* --- Estadísticas --- */
+  /* Stats */
   .stats {
     display: flex;
     justify-content: center;
     gap: 1.5rem;
     flex-wrap: wrap;
   }
-
   .stat-box {
     background: #1e1e1e;
     padding: 1rem 2rem;
@@ -179,26 +229,91 @@ const progressPercent = Math.min((currentDay / GOAL_DAYS) * 100, 100).toFixed(
     border: 1px solid #2d2d2d;
     min-width: 140px;
   }
-
   .stat-box .label {
     display: block;
     font-size: 0.75rem;
     color: #71717a;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 0.5rem;
   }
-
   .stat-box .value {
     font-size: 2.2rem;
     font-weight: 800;
-    color: #fff;
   }
 
-  /* --- Grid --- */
+  /* Grid y Cards (Replicados en CSS porque JS los inyecta como HTML plano) */
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 2rem;
+  }
+
+  .card {
+    background: #1e1e1e;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s;
+    border: 1px solid #333;
+  }
+  .card:hover {
+    transform: translateY(-5px);
+    border-color: #646cff;
+  }
+  .video-container {
+    position: relative;
+    padding-bottom: 56.25%;
+    background: black;
+  }
+  .video-container iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .info {
+    padding: 1.5rem;
+  }
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    align-items: center;
+  }
+  .badge {
+    background: #646cff;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: bold;
+  }
+  .date {
+    color: #888;
+    font-size: 0.9rem;
+  }
+  .info h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: white;
+  }
+  .info p {
+    color: #ccc;
+    margin-top: 0.5rem;
+    font-size: 0.95rem;
+  }
+
+  /* Animación simple de entrada */
+  .fade-in {
+    animation: fadeIn 0.5s ease-in;
+  }
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 </style>
