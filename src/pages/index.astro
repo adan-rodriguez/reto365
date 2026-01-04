@@ -2,11 +2,18 @@
 import VideoCard from "../components/VideoCard.astro";
 import { videos } from "../data/videos.js";
 
-// Ordenamos para ver el último día primero
+// 1. Lógica de ordenamiento y estadísticas
 const sortedVideos = [...videos].sort((a, b) => b.day - a.day);
-
-// Calculamos el total acumulado (opcional, solo por diversión estadística)
+const currentDay = videos.length;
+const lastVideo = videos[videos.length - 1];
 const totalPushups = videos.reduce((acc, curr) => acc + curr.count, 0);
+
+// 2. Lógica de la Barra de Progreso
+const GOAL_DAYS = 365;
+// Calculamos el porcentaje (con un decimal para ver pequeños avances)
+const progressPercent = Math.min((currentDay / GOAL_DAYS) * 100, 100).toFixed(
+  1
+);
 ---
 
 <html lang="es">
@@ -19,17 +26,33 @@ const totalPushups = videos.reduce((acc, curr) => acc + curr.count, 0);
   <body>
     <main>
       <header class="hero">
-        <h1>Reto de Flexiones <span class="year">2026</span></h1>
-        <p class="subtitle">Una flexión más cada día hasta fin de año.</p>
+        <h1>Reto de Flexiones <span class="accent">2026</span></h1>
+        <p class="subtitle">
+          La disciplina es hacer lo que tienes que hacer, incluso cuando no
+          quieres.
+        </p>
 
+        <div class="progress-section">
+          <div class="progress-labels">
+            <span>Progreso del Reto</span>
+            <span class="progress-text"
+              >{progressPercent}% ({currentDay}/{GOAL_DAYS} días)</span
+            >
+          </div>
+
+          <div class="progress-track">
+            <div class="progress-fill" style={`width: ${progressPercent}%;`}>
+            </div>
+          </div>
+        </div>
         <div class="stats">
           <div class="stat-box">
             <span class="label">Día Actual</span>
-            <span class="value">{videos.length}</span>
+            <span class="value">{currentDay}</span>
           </div>
           <div class="stat-box">
             <span class="label">Flexiones Hoy</span>
-            <span class="value">{videos[videos.length - 1]?.count || 0}</span>
+            <span class="value">{lastVideo?.count || 0}</span>
           </div>
           <div class="stat-box">
             <span class="label">Total Acumulado</span>
@@ -56,9 +79,9 @@ const totalPushups = videos.reduce((acc, curr) => acc + curr.count, 0);
 </html>
 
 <style>
-  /* Estilos Globales Simples */
+  /* --- Estilos Globales --- */
   body {
-    font-family: system-ui, sans-serif;
+    font-family: "Segoe UI", system-ui, sans-serif; /* Fuente más moderna */
     background-color: #121212;
     color: white;
     margin: 0;
@@ -66,66 +89,116 @@ const totalPushups = videos.reduce((acc, curr) => acc + curr.count, 0);
   }
 
   main {
-    max-width: 1200px;
+    max-width: 1000px;
     margin: 0 auto;
     padding: 2rem;
   }
 
-  /* Hero Section */
+  /* --- Hero Section --- */
   .hero {
     text-align: center;
-    margin-bottom: 3rem;
-    padding: 2rem 0;
+    margin-bottom: 4rem;
+    padding-top: 2rem;
   }
 
   h1 {
-    font-size: 3rem;
+    font-size: 3.5rem;
     margin-bottom: 0.5rem;
+    font-weight: 800;
+    letter-spacing: -1px;
   }
 
-  .year {
-    color: #646cff;
+  .accent {
+    background: linear-gradient(45deg, #646cff, #a855f7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
 
   .subtitle {
-    font-size: 1.2rem;
-    color: #ccc;
-    margin-bottom: 2rem;
+    font-size: 1.1rem;
+    color: #a1a1aa;
+    margin-bottom: 3rem;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
   }
 
-  /* Estadísticas */
+  /* --- Barra de Progreso (NUEVOS ESTILOS) --- */
+  .progress-section {
+    max-width: 600px;
+    margin: 0 auto 3rem auto;
+    background: #1e1e1e;
+    padding: 1.5rem;
+    border-radius: 16px;
+    border: 1px solid #333;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  }
+
+  .progress-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.8rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #e4e4e7;
+  }
+
+  .progress-text {
+    color: #a855f7; /* Color violeta claro */
+  }
+
+  .progress-track {
+    width: 100%;
+    height: 12px;
+    background-color: #333;
+    border-radius: 999px;
+    overflow: hidden; /* Para que la barra interna no se salga de los bordes redondeados */
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #646cff, #a855f7);
+    border-radius: 999px;
+    transition: width 1s ease-out; /* Animación suave al cargar */
+    box-shadow: 0 0 10px rgba(168, 85, 247, 0.5); /* Resplandor sutil */
+  }
+
+  /* --- Estadísticas --- */
   .stats {
     display: flex;
     justify-content: center;
-    gap: 2rem;
+    gap: 1.5rem;
     flex-wrap: wrap;
   }
 
   .stat-box {
-    background: #2a2a2a;
+    background: #1e1e1e;
     padding: 1rem 2rem;
-    border-radius: 8px;
+    border-radius: 12px;
     text-align: center;
+    border: 1px solid #2d2d2d;
+    min-width: 140px;
   }
 
   .stat-box .label {
     display: block;
-    font-size: 0.8rem;
-    color: #888;
+    font-size: 0.75rem;
+    color: #71717a;
     text-transform: uppercase;
     letter-spacing: 1px;
+    margin-bottom: 0.5rem;
   }
 
   .stat-box .value {
-    font-size: 2rem;
-    font-weight: bold;
+    font-size: 2.2rem;
+    font-weight: 800;
     color: #fff;
   }
 
-  /* Grid de Videos */
+  /* --- Grid --- */
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 2rem;
   }
 </style>
