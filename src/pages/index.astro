@@ -1,21 +1,18 @@
+---
+// src/pages/index.astro
+---
+
 <html lang="es">
   <head>
     <meta charset="utf-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width" />
     <title>Reto Flexiones 2026</title>
-    <script
-      is:inline
-      src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"
-    ></script>
   </head>
   <body>
     <main>
       <header class="hero">
         <h1>Reto de Flexiones <span class="accent">2026</span></h1>
-        <p class="subtitle">
-          Una flexión de brazo más por día hasta que termine el año.
-        </p>
 
         <div
           class="progress-section"
@@ -23,8 +20,8 @@
           style="display: none;"
         >
           <div class="progress-labels">
-            <span>Progreso</span>
-            <span class="progress-text" id="progress-text">0%</span>
+            <span>Progreso Anual</span>
+            <span class="progress-text" id="progress-text">0/365</span>
           </div>
           <div class="progress-track">
             <div class="progress-fill" id="progress-fill" style="width: 0%;">
@@ -38,14 +35,6 @@
           style="opacity: 0; transition: opacity 0.5s;"
         >
           <div class="stat-box">
-            <span class="label">Día Actual</span>
-            <span class="value" id="stat-day">-</span>
-          </div>
-          <div class="stat-box">
-            <span class="label">Flexiones Hoy</span>
-            <span class="value" id="stat-today">-</span>
-          </div>
-          <div class="stat-box">
             <span class="label">Total Acumulado</span>
             <span class="value" id="stat-total">-</span>
           </div>
@@ -53,17 +42,30 @@
       </header>
 
       <section class="grid" id="video-grid">
-        <p style="text-align: center; color: #666;">Cargando videos...</p>
+        <div class="loading">Cargando videos...</div>
       </section>
     </main>
 
     <script is:inline>
+      // ------------------------------------------------------
+      // 1. PEGA AQUÍ TU URL DE GOOGLE SHEETS (CSV)
       const SHEET_URL =
-        "https://docs.google.com/spreadsheets/d/e/2PACX-1vSi5taqFE6-_lgB2ds-962Dga1nvfQcez6XjQzK-tfA1M0yWDfz9Pe9e0Q4sBiNlO3EZVWz33tevfoq/pub?gid=0&single=true&output=csv";
+        "https://docs.google.com/spreadsheets/d/e/2PACX-1vSi5taqFE6-_lgB2ds-962Dga1nvfQcez6XjQzK-tfA1M0yWDfz9Pe9e0Q4sBiNlO3EZVWz33tevfoq/pub?output=csv";
+
+      // 2. FECHA DE INICIO DEL RETO (Año, Mes-1, Día)
+      const START_DATE = new Date(2026, 0, 1);
+      // ------------------------------------------------------
 
       const GOAL_DAYS = 365;
 
-      // Función para crear la tarjeta HTML
+      function formatDate(date) {
+        return date.toLocaleDateString("es-AR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        });
+      }
+
       function createCard(video) {
         return `
           <article class="card fade-in">
@@ -77,40 +79,43 @@
                 loading="lazy" 
               ></iframe>
             </div>
-            <div class="info">
-              <header class="card-header">
-                <span class="badge">Día ${video.day}</span>
-                <span class="date">${video.date}</span>
-              </header>
-              <h2>${video.count} Flexiones</h2>
-              ${video.description ? `<p>${video.description}</p>` : ""}
+            <div class="info-minimal">
+              <span class="badge">Día ${video.day}</span>
+              <span class="date">${video.dateStr}</span>
             </div>
           </article>
         `;
       }
 
-      // Descargamos y procesamos los datos
-      Papa.parse(SHEET_URL, {
-        download: true,
-        header: true,
-        complete: function (results) {
-          const rawData = results.data;
+      async function loadVideos() {
+        try {
+          const response = await fetch(SHEET_URL);
+          const data = await response.text();
 
-          // Filtramos filas vacías y limpiamos datos
-          const videos = rawData
-            .filter((row) => row.day && row.videoId) // Solo filas con datos
-            .map((row) => ({
-              day: parseInt(row.day),
-              count: parseInt(row.count),
-              date: row.date,
-              videoId: row.videoId.trim(),
-              description: row.description,
-            }))
-            .sort((a, b) => b.day - a.day); // Ordenar: más reciente primero
+          const rows = data
+            .split(/\r?\n/)
+            .map((row) => row.trim())
+            .filter((row) => row.length > 0);
 
-          if (videos.length === 0) return;
+          if (rows.length === 0) throw new Error("No hay videos");
 
-          // 1. Actualizar Estadísticas
+          const videos = rows
+            .map((id, index) => {
+              const dayNumber = index + 1;
+              const videoDate = new Date(START_DATE);
+              videoDate.setDate(START_DATE.getDate() + index);
+
+              return {
+                videoId: id,
+                day: dayNumber,
+                count: dayNumber,
+                dateStr: formatDate(videoDate),
+              };
+            })
+            .reverse();
+
+          // --- Actualizar Interfaz ---
+
           const currentDay = videos.length;
           const totalPushups = videos.reduce(
             (acc, curr) => acc + curr.count,
@@ -120,150 +125,166 @@
             1
           );
 
-          document.getElementById("stat-day").innerText = currentDay;
-          document.getElementById("stat-today").innerText = videos[0].count; // El primero es el más reciente
-          document.getElementById("stat-total").innerText = totalPushups;
+          document.getElementById("stat-total").innerText =
+            totalPushups.toLocaleString();
           document.getElementById("stats-container").style.opacity = 1;
 
-          // 2. Actualizar Barra
+          // CAMBIO AQUÍ: Formato "Día actual/365"
           document.getElementById("progress-text").innerText =
-            `${percent}% (${currentDay}/${GOAL_DAYS})`;
+            `Día ${currentDay}/${GOAL_DAYS}`;
+
           document.getElementById("progress-fill").style.width = `${percent}%`;
           document.getElementById("progress-container").style.display = "block";
 
-          // 3. Renderizar Videos
           const grid = document.getElementById("video-grid");
           grid.innerHTML = videos.map(createCard).join("");
-        },
-        error: function (err) {
-          console.error("Error cargando Sheet:", err);
+        } catch (error) {
+          console.error(error);
           document.getElementById("video-grid").innerHTML =
-            '<p style="color:red">Error cargando los datos.</p>';
-        },
-      });
+            '<p style="text-align:center; color:#ff6b6b">Error al cargar la lista de videos.</p>';
+        }
+      }
+
+      loadVideos();
     </script>
   </body>
 </html>
 
 <style is:global>
+  /* --- Estilos Globales --- */
   body {
-    font-family: "Segoe UI", system-ui, sans-serif;
-    background-color: #121212;
-    color: white;
+    font-family:
+      system-ui,
+      -apple-system,
+      sans-serif;
+    background-color: #0a0a0a;
+    color: #ffffff;
     margin: 0;
     padding: 0;
   }
+
   main {
-    max-width: 1000px;
+    max-width: 900px;
     margin: 0 auto;
     padding: 2rem;
   }
 
+  /* --- Hero --- */
   .hero {
     text-align: center;
-    margin-bottom: 4rem;
-    padding-top: 2rem;
-  }
-  h1 {
-    font-size: 3.5rem;
-    margin-bottom: 0.5rem;
-    font-weight: 800;
-    letter-spacing: -1px;
-  }
-  .accent {
-    background: linear-gradient(45deg, #646cff, #a855f7);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-  .subtitle {
-    font-size: 1.1rem;
-    color: #a1a1aa;
     margin-bottom: 3rem;
   }
 
-  /* Barra de Progreso */
-  .progress-section {
-    max-width: 600px;
-    margin: 0 auto 3rem auto;
-    background: #1e1e1e;
-    padding: 1.5rem;
-    border-radius: 16px;
-    border: 1px solid #333;
-  }
-  .progress-labels {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 0.8rem;
-    color: #e4e4e7;
-    font-weight: 600;
-  }
-  .progress-text {
-    color: #a855f7;
-  }
-  .progress-track {
-    width: 100%;
-    height: 12px;
-    background-color: #333;
-    border-radius: 999px;
-    overflow: hidden;
-  }
-  .progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #646cff, #a855f7);
-    border-radius: 999px;
-    transition: width 1s ease-out;
-  }
-
-  /* Stats */
-  .stats {
-    display: flex;
-    justify-content: center;
-    gap: 1.5rem;
-    flex-wrap: wrap;
-  }
-  .stat-box {
-    background: #1e1e1e;
-    padding: 1rem 2rem;
-    border-radius: 12px;
-    text-align: center;
-    border: 1px solid #2d2d2d;
-    min-width: 140px;
-  }
-  .stat-box .label {
-    display: block;
-    font-size: 0.75rem;
-    color: #71717a;
-    text-transform: uppercase;
-  }
-  .stat-box .value {
-    font-size: 2.2rem;
+  h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1.5rem;
     font-weight: 800;
   }
 
-  /* Grid y Cards (Replicados en CSS porque JS los inyecta como HTML plano) */
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 2rem;
+  .accent {
+    color: #8b5cf6;
   }
 
-  .card {
-    background: #1e1e1e;
+  /* --- Barra de Progreso --- */
+  .progress-section {
+    max-width: 500px;
+    margin: 0 auto 2rem auto;
+    background: #171717;
+    padding: 1rem 1.5rem;
     border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-    transition: transform 0.2s;
     border: 1px solid #333;
   }
-  .card:hover {
-    transform: translateY(-5px);
-    border-color: #646cff;
+
+  .progress-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    font-size: 0.85rem;
+    color: #a1a1aa;
   }
+
+  .progress-text {
+    color: #fff;
+    font-weight: bold;
+  }
+
+  .progress-track {
+    width: 100%;
+    height: 8px;
+    background: #333;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: #8b5cf6;
+    border-radius: 10px;
+    transition: width 1s ease;
+  }
+
+  /* --- Estadísticas --- */
+  .stats {
+    display: flex;
+    justify-content: center;
+  }
+
+  .stat-box {
+    text-align: center;
+  }
+
+  .stat-box .label {
+    display: block;
+    font-size: 0.8rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 0.2rem;
+  }
+
+  .stat-box .value {
+    font-size: 3rem;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1;
+  }
+
+  /* --- Grid --- */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .loading {
+    text-align: center;
+    width: 100%;
+    color: #666;
+    grid-column: 1 / -1;
+  }
+
+  /* --- Card Minimalista --- */
+  .card {
+    background: #171717;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #262626;
+    transition:
+      transform 0.2s,
+      border-color 0.2s;
+  }
+
+  .card:hover {
+    transform: translateY(-3px);
+    border-color: #8b5cf6;
+  }
+
   .video-container {
     position: relative;
     padding-bottom: 56.25%;
     background: black;
   }
+
   .video-container iframe {
     position: absolute;
     top: 0;
@@ -271,40 +292,33 @@
     width: 100%;
     height: 100%;
   }
-  .info {
-    padding: 1.5rem;
-  }
-  .card-header {
+
+  .info-minimal {
+    padding: 1rem;
     display: flex;
     justify-content: space-between;
-    margin-bottom: 0.5rem;
     align-items: center;
-  }
-  .badge {
-    background: #646cff;
-    padding: 0.25rem 0.75rem;
-    border-radius: 999px;
-    font-size: 0.8rem;
-    font-weight: bold;
-  }
-  .date {
-    color: #888;
-    font-size: 0.9rem;
-  }
-  .info h2 {
-    margin: 0;
-    font-size: 1.5rem;
-    color: white;
-  }
-  .info p {
-    color: #ccc;
-    margin-top: 0.5rem;
-    font-size: 0.95rem;
+    background: #171717;
   }
 
-  /* Animación simple de entrada */
+  .badge {
+    background: #333;
+    color: #fff;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .date {
+    color: #666;
+    font-size: 0.85rem;
+    font-family: monospace;
+  }
+
+  /* Animación */
   .fade-in {
-    animation: fadeIn 0.5s ease-in;
+    animation: fadeIn 0.6s ease-out;
   }
   @keyframes fadeIn {
     from {
